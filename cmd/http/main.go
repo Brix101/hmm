@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
@@ -62,7 +63,7 @@ func main() {
 type FileInfo struct {
 	Name     string     `json:"name"`
 	Size     int64      `json:"size"`
-	IsFolder bool       `json:"isFolder"`
+	FileType string     `json:"fileType,omitempty"`
 	Items    []FileInfo `json:"items"`
 }
 
@@ -201,10 +202,9 @@ func FolderStructure(folderPath string) (FileInfo, error) {
 
 	// Create FileInfo for the folder
 	folder := FileInfo{
-		Name:     folderInfo.Name(),
-		Size:     folderInfo.Size(),
-		IsFolder: true,
-		Items:    []FileInfo{},
+		Name:  folderInfo.Name(),
+		Size:  folderInfo.Size(),
+		Items: []FileInfo{},
 	}
 
 	// Read folder contents
@@ -233,11 +233,20 @@ func FolderStructure(folderPath string) (FileInfo, error) {
 			// Add subfolder to the folder's items
 			folder.Items = append(folder.Items, subfolder)
 		} else {
+			// Get the file type and MIME type
+			fileType := filepath.Ext(fileInfo.Name())
+			mimeType := mime.TypeByExtension(fileType)
+
 			// Create FileInfo for the file
 			file := FileInfo{
 				Name:     fileInfo.Name(),
 				Size:     fileInfo.Size(),
-				IsFolder: false,
+				FileType: fileType,
+			}
+
+			// Set the MIME type if available
+			if mimeType != "" {
+				file.FileType = mimeType
 			}
 
 			// Add file to the folder's items
