@@ -17,6 +17,7 @@ type FileInfo struct {
 	Name     string     `json:"name"`
 	Size     int64      `json:"size"`
 	FileType string     `json:"fileType,omitempty"`
+	PATH     string     `json:"path,omitempty"`
 	Files    []FileInfo `json:"files,omitempty"`
 }
 
@@ -101,7 +102,7 @@ func FileRouter() http.Handler {
 		// Remove "api/files" segment from the path
 		path = strings.TrimPrefix(path, "api/files")
 
-		folderStructure, err := folderStructureReader(filesPath + path)
+		folderStructure, err := folderStructureReader(filesPath+path, filesPath)
 		if err != nil {
 			// Log the error
 			log.Println("Error building folder structure:", err)
@@ -167,7 +168,7 @@ func fileRouteReader(r chi.Router, path string, root http.FileSystem) {
 	})
 }
 
-func folderStructureReader(folderPath string) (FileInfo, error) {
+func folderStructureReader(folderPath string, basePath string) (FileInfo, error) {
 	// Get folder information
 	folderInfo, err := os.Stat(folderPath)
 	if err != nil {
@@ -175,9 +176,12 @@ func folderStructureReader(folderPath string) (FileInfo, error) {
 	}
 
 	// Create FileInfo for the folder
+	trimmedFolderPath := strings.TrimPrefix(folderPath, basePath)
+
 	folder := FileInfo{
 		Name:  folderInfo.Name(),
 		Size:  folderInfo.Size(),
+		PATH:  trimmedFolderPath,
 		Files: []FileInfo{},
 	}
 
@@ -199,7 +203,7 @@ func folderStructureReader(folderPath string) (FileInfo, error) {
 
 		if fileInfo.IsDir() {
 			// Recursively build folder structure for subfolders
-			subfolder, err := folderStructureReader(itemPath)
+			subfolder, err := folderStructureReader(itemPath, basePath)
 			if err != nil {
 				return FileInfo{}, err
 			}
@@ -215,6 +219,7 @@ func folderStructureReader(folderPath string) (FileInfo, error) {
 			file := FileInfo{
 				Name:     fileInfo.Name(),
 				Size:     fileInfo.Size(),
+				PATH:     folder.PATH + "/" + fileInfo.Name(),
 				FileType: fileType,
 			}
 
