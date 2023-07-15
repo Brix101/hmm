@@ -5,6 +5,7 @@ const baseFileSchema = z.object({
   size: z.number(),
   path: z.string(),
   fileType: z.string().optional().nullish(),
+  created_at: z.string(),
 });
 
 export type FileEntity = z.infer<typeof baseFileSchema> & {

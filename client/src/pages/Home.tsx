@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { STATIC_URL } from "@/constant/server.constant";
 import { useQueryFile } from "@/services/file.service";
 import { useBoundStore } from "@/store";
-import { Fragment } from "react";
 
 const Home = () => {
   const {
@@ -13,12 +12,18 @@ const Home = () => {
   } = useBoundStore();
 
   const { data, isLoading } = useQueryFile(fileUrls ?? "");
+
+  const breadCrums = fileUrls?.replace("/", "").split("/");
   if (isLoading) {
     return <h1>Loading</h1>;
   }
 
   function handleResetClick() {
     resetUrl();
+  }
+
+  function handleBreadCrumbsClick(index: number) {
+    appendToUrl(`/${breadCrums?.slice(0, index + 1).join("/")}`);
   }
   return (
     <>
@@ -30,11 +35,11 @@ const Home = () => {
           >
             Files
           </div>
-          {fileUrls
-            ?.replace("/", "")
-            .split("/")
-            .map((url, index) => (
-              <Fragment key={index}>
+          {breadCrums?.map((url, index) => {
+            const isActive = breadCrums?.length - 1 === index;
+
+            return (
+              <div className="flex items-center" key={index}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
@@ -50,16 +55,19 @@ const Home = () => {
                 >
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
-                <div
-                  className={
-                    fileUrls.length - 1 === index ? "text-foreground" : ""
-                  }
+                <button
+                  className={`${isActive
+                      ? "text-foreground"
+                      : "cursor-pointer hover:underline "
+                    }`}
+                  onClick={() => handleBreadCrumbsClick(index)}
+                  disabled={isActive}
                 >
                   {url}
-                  {index}
-                </div>
-              </Fragment>
-            ))}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
 

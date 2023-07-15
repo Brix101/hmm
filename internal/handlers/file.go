@@ -9,16 +9,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type FileInfo struct {
-	Name     string     `json:"name"`
-	Size     int64      `json:"size"`
-	FileType string     `json:"fileType,omitempty"`
-	PATH     string     `json:"path,omitempty"`
-	Files    []FileInfo `json:"files,omitempty"`
+	Name      string     `json:"name"`
+	Size      int64      `json:"size"`
+	FileType  string     `json:"fileType,omitempty"`
+	PATH      string     `json:"path,omitempty"`
+	Files     []FileInfo `json:"files,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 func FileRouter() http.Handler {
@@ -179,10 +181,11 @@ func folderStructureReader(folderPath string, basePath string) (FileInfo, error)
 	trimmedFolderPath := strings.TrimPrefix(folderPath, basePath)
 
 	folder := FileInfo{
-		Name:  folderInfo.Name(),
-		Size:  folderInfo.Size(),
-		PATH:  trimmedFolderPath,
-		Files: []FileInfo{},
+		Name:      folderInfo.Name(),
+		Size:      folderInfo.Size(),
+		PATH:      trimmedFolderPath,
+		CreatedAt: folderInfo.ModTime(),
+		Files:     []FileInfo{},
 	}
 
 	// Read folder contents
@@ -217,10 +220,11 @@ func folderStructureReader(folderPath string, basePath string) (FileInfo, error)
 
 			// Create FileInfo for the file
 			file := FileInfo{
-				Name:     fileInfo.Name(),
-				Size:     fileInfo.Size(),
-				PATH:     folder.PATH + "/" + fileInfo.Name(),
-				FileType: fileType,
+				Name:      fileInfo.Name(),
+				Size:      fileInfo.Size(),
+				PATH:      folder.PATH + "/" + fileInfo.Name(),
+				FileType:  fileType,
+				CreatedAt: fileInfo.ModTime(),
 			}
 
 			// Set the MIME type if available
