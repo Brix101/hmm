@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -57,13 +56,6 @@ func main() {
 	<-serverCtx.Done()
 }
 
-type FileInfo struct {
-	Name     string     `json:"name"`
-	Size     int64      `json:"size"`
-	FileType string     `json:"fileType,omitempty"`
-	Files    []FileInfo `json:"files,omitempty"`
-}
-
 func service() http.Handler {
 	r := chi.NewRouter()
 	// Set up CORS middleware
@@ -75,37 +67,15 @@ func service() http.Handler {
 		AllowCredentials: true,
 		MaxAge:           300, // Maximum value in seconds for the Access-Control-Max-Age header
 	})
+
 	r.Use(cors.Handler)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 
-	// Create a route along /files that will serve contents from
-	// the ./data/ folder.
-	workDir, _ := os.Getwd()
-
-	// Specify the relative path to the files folder
-	spaPath := filepath.Join(workDir, "client", "dist")
-
-	// Serve static files from the specified directory
-	staticDir := "/assets/"
-	staticFiles := http.FileServer(http.Dir(filepath.Join(spaPath, staticDir)))
-	r.Handle(staticDir+"*", http.StripPrefix(staticDir, staticFiles))
-
-	mediaDir := "/"
-	mediaFiles := http.FileServer(http.Dir(filepath.Join(spaPath, mediaDir)))
-	r.Handle(mediaDir+"*", http.StripPrefix(mediaDir, mediaFiles))
-
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		indexPath := filepath.Join(spaPath, "index.html")
-		http.ServeFile(w, r, indexPath)
-	})
-
-	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		indexPath := filepath.Join(spaPath, "index.html")
-		http.ServeFile(w, r, indexPath)
-	})
-
+	clientRouter := handlers.ClientRouter()
 	fileRouter := handlers.FileRouter()
+
+	r.Mount("/", clientRouter)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Mount("/", fileRouter)
