@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"home-server/internal/handlers"
+	"home-server/pkg/db"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,7 +22,17 @@ import (
 func main() {
 	// The HTTP Server
 	server := &http.Server{Addr: "0.0.0.0:5000", Handler: service()}
+	pool := db.CreateConnectionPool()
 
+	schema := `CREATE TABLE place (
+    country text,
+    city text NULL,
+    telcode integer);`
+
+	// execute a query on the server
+	result, _ := pool.Exec(schema)
+
+	fmt.Println(result)
 	// Server run context
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
@@ -58,6 +72,11 @@ func main() {
 
 func service() http.Handler {
 	r := chi.NewRouter()
+	workDir, _ := os.Getwd()
+
+	// Specify the relative path to the files folder
+	filesPath := filepath.Join(workDir, "data")
+	filesDir := http.Dir(filesPath)
 	// Set up CORS middleware
 	cors := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173", "http://190.160.15.44:5173"}, // Add your allowed origins here
@@ -73,13 +92,39 @@ func service() http.Handler {
 	r.Use(middleware.Logger)
 
 	clientRouter := handlers.ClientRouter()
-	fileRouter := handlers.FileRouter()
 
 	r.Mount("/", clientRouter)
 
+	filesResource := handlers.FilesResource{FilesPath: filesPath}
+	userResource := handlers.UsersResource{}
+
 	r.Route("/api", func(r chi.Router) {
-		r.Mount("/", fileRouter)
+		r.Mount("/files", filesResource.Routes())
+		r.Mount("/users", userResource.Routes())
 	})
 
+	FileServer(r, "/data/files", filesDir)
+
 	return r
+}
+
+// FileServer conveniently sets up a http.FileServer handler to serve
+// static files from a http.FileSystem.
+func FileServer(r chi.Router, path string, root http.FileSystem) {
+	if strings.ContainsAny(path, "{}*") {
+		panic("FileServer does not permit any URL parameters.")
+	}
+
+	if path != "/" && path[len(path)-1] != '/' {
+		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
+		path += "/"
+	}
+	path += "*"
+
+	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
+		rctx := chi.RouteContext(r.Context())
+		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
+		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
+		fs.ServeHTTP(w, r)
+	})
 }

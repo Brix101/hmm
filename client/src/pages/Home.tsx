@@ -6,25 +6,26 @@ import { useBoundStore } from "@/store";
 
 const Home = () => {
   const {
-    file: { fileUrls },
-    appendToUrl,
-    resetUrl,
+    file: { activeFilePath },
+    setActiveFilePath,
   } = useBoundStore();
 
-  const { data, isLoading } = useQueryFile(fileUrls ?? "");
+  const { data, isLoading } = useQueryFile(activeFilePath ?? "");
 
-  const breadCrums = fileUrls?.replace("/", "").split("/");
+  const breadCrumbs = activeFilePath?.replace("/", "").split("/");
+
   if (isLoading) {
     return <h1>Loading</h1>;
   }
 
   function handleResetClick() {
-    resetUrl();
+    setActiveFilePath(undefined);
   }
 
-  function handleBreadCrumbsClick(index: number) {
-    appendToUrl(`/${breadCrums?.slice(0, index + 1).join("/")}`);
+  function handleBreadCrumbsClick({ index }: { index: number }) {
+    setActiveFilePath(`/${breadCrumbs?.slice(0, index + 1).join("/")}`);
   }
+
   return (
     <>
       <div>
@@ -35,8 +36,8 @@ const Home = () => {
           >
             Files
           </div>
-          {breadCrums?.map((url, index) => {
-            const isActive = breadCrums?.length - 1 === index;
+          {breadCrumbs?.map((url, index) => {
+            const isActive = breadCrumbs?.length - 1 === index;
 
             return (
               <div className="flex items-center" key={index}>
@@ -60,7 +61,7 @@ const Home = () => {
                       ? "text-foreground"
                       : "cursor-pointer hover:underline "
                     }`}
-                  onClick={() => handleBreadCrumbsClick(index)}
+                  onClick={() => handleBreadCrumbsClick({ index })}
                   disabled={isActive}
                 >
                   {url}
@@ -81,7 +82,9 @@ const Home = () => {
                 <>{file.name}</>
               )}
               {file.files ? (
-                <Button onClick={() => appendToUrl(file.path)}>navigate</Button>
+                <Button onClick={() => setActiveFilePath(file.path)}>
+                  navigate
+                </Button>
               ) : undefined}
             </CardContent>
           </Card>

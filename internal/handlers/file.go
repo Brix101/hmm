@@ -23,99 +23,109 @@ type FileInfo struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
-func FileRouter() http.Handler {
+type FilesResource struct{ FilesPath string }
+
+// Routes creates a REST router for the todos resource
+func (rs FilesResource) Routes() chi.Router {
 	r := chi.NewRouter()
-	workDir, _ := os.Getwd()
+	// r.Use() // some middleware..
 
-	// Specify the relative path to the files folder
-	filesPath := filepath.Join(workDir, "data")
-	filesDir := http.Dir(filesPath)
-	fileServer(r, "/data", filesDir)
+	r.Get("/*", rs.List)    // GET /todos - read a list of todos
+	r.Post("/*", rs.Create) // POST /todos - create a new todo and persist it
+	// r.Put("/", rs.Delete)
 
-	r.Post("/files/*", func(w http.ResponseWriter, r *http.Request) {
-		// Parse the JSON request body to retrieve the folder name
-		type FolderRequest struct {
-			Name string `json:"name"`
+	// r.Route("/{id}", func(r chi.Router) {
+	// 	// r.Use(rs.TodoCtx) // lets have a todos map, and lets actually load/manipulate
+	// 	r.Get("/", rs.Get)       // GET /todos/{id} - read a single todo by :id
+	// 	r.Put("/", rs.Update)    // PUT /todos/{id} - update a single todo by :id
+	// 	r.Delete("/", rs.Delete) // DELETE /todos/{id} - delete a single todo by :id
+	// 	r.Get("/sync", rs.Sync)
+	// })
+
+	return r
+}
+
+func (rs FilesResource) List(w http.ResponseWriter, r *http.Request) {
+	// Extract the nested route from the request URL
+	path := strings.TrimPrefix(r.URL.Path, "/")
+
+	// Remove "api/files" segment from the path
+	path = strings.TrimPrefix(path, "api/files")
+
+	folderStructure, err := folderStructureReader(rs.FilesPath+path, rs.FilesPath)
+	if err != nil {
+		// Log the error
+		log.Println("Error building folder structure:", err)
+
+		// Return an appropriate response
+		http.Error(w, "Error building folder structure", http.StatusInternalServerError)
+		return
+	}
+
+	// Convert folder structure to JSON
+	jsonData, err := json.Marshal(folderStructure)
+	if err != nil {
+		// Log the error
+		log.Println("Error encoding JSON:", err)
+
+		// Return an appropriate response
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Set response headers
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	// Write the JSON response
+	w.Write(jsonData)
+}
+
+func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
+	// Parse the JSON request body to retrieve the folder name
+	type FolderRequest struct {
+		Name string `json:"name"`
+	}
+	var folderReq FolderRequest
+	err := json.NewDecoder(r.Body).Decode(&folderReq)
+	if err != nil {
+		// Log the error
+		log.Println("Error parsing request body:", err)
+
+		// Return an appropriate response
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Extract the nested route from the request URL
+	path := strings.TrimPrefix(r.URL.Path, "/")
+
+	// Remove "api/files" segment from the path
+	path = strings.TrimPrefix(path, "api/files")
+
+	// Create the new folder
+	newFolderPath := filepath.Join(rs.FilesPath+path, folderReq.Name)
+	err = os.Mkdir(newFolderPath, 0755)
+	if err != nil {
+		// Log the error
+		log.Println("Error creating folder:", err)
+
+		// Split the error message
+		errorMessage := strings.SplitN(err.Error(), ":", 2)
+		errorDetail := ""
+		if len(errorMessage) > 1 {
+			errorDetail = strings.TrimSpace(errorMessage[1])
+		} else {
+			errorDetail = strings.TrimSpace(errorMessage[0])
 		}
-		var folderReq FolderRequest
-		err := json.NewDecoder(r.Body).Decode(&folderReq)
-		if err != nil {
-			// Log the error
-			log.Println("Error parsing request body:", err)
 
-			// Return an appropriate response
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
+		// Create an error response
+		errorResponse := struct {
+			Detail string `json:"detail"`
+		}{
+			Detail: errorDetail,
 		}
-
-		// Extract the nested route from the request URL
-		path := strings.TrimPrefix(r.URL.Path, "/")
-
-		// Remove "api/files" segment from the path
-		path = strings.TrimPrefix(path, "api/files")
-
-		// Create the new folder
-		newFolderPath := filepath.Join(filesPath+path, folderReq.Name)
-		err = os.Mkdir(newFolderPath, 0755)
-		if err != nil {
-			// Log the error
-			log.Println("Error creating folder:", err)
-
-			// Split the error message
-			errorMessage := strings.SplitN(err.Error(), ":", 2)
-			errorDetail := ""
-			if len(errorMessage) > 1 {
-				errorDetail = strings.TrimSpace(errorMessage[1])
-			} else {
-				errorDetail = strings.TrimSpace(errorMessage[0])
-			}
-
-			// Create an error response
-			errorResponse := struct {
-				Detail string `json:"detail"`
-			}{
-				Detail: errorDetail,
-			}
-			jsonResponse, err := json.Marshal(errorResponse)
-			if err != nil {
-				// Log the error
-				log.Println("Error encoding JSON:", err)
-
-				// Return an appropriate response
-				http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
-				return
-			}
-
-			// Set response headers
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write(jsonResponse)
-			return
-		}
-
-		// Return a success response
-		w.WriteHeader(http.StatusCreated)
-	})
-
-	r.Get("/files/*", func(w http.ResponseWriter, r *http.Request) {
-		// Extract the nested route from the request URL
-		path := strings.TrimPrefix(r.URL.Path, "/")
-
-		// Remove "api/files" segment from the path
-		path = strings.TrimPrefix(path, "api/files")
-
-		folderStructure, err := folderStructureReader(filesPath+path, filesPath)
-		if err != nil {
-			// Log the error
-			log.Println("Error building folder structure:", err)
-
-			// Return an appropriate response
-			http.Error(w, "Error building folder structure", http.StatusInternalServerError)
-			return
-		}
-
-		// Convert folder structure to JSON
-		jsonData, err := json.Marshal(folderStructure)
+		jsonResponse, err := json.Marshal(errorResponse)
 		if err != nil {
 			// Log the error
 			log.Println("Error encoding JSON:", err)
@@ -127,27 +137,13 @@ func FileRouter() http.Handler {
 
 		// Set response headers
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write(jsonResponse)
+		return
+	}
 
-		// Write the JSON response
-		w.Write(jsonData)
-	})
-
-	/*
-		r.Get("/slow", func(w http.ResponseWriter, r *http.Request) {
-			// Simulates some hard work.
-			//
-			// We want this handler to complete successfully during a shutdown signal,
-			// so consider the work here as some background routine to fetch a long running
-			// search query to find as many results as possible, but, instead we cut it short
-			// and respond with what we have so far. How a shutdown is handled is entirely
-			// up to the developer, as some code blocks are preemptible, and others are not.
-			time.Sleep(5 * time.Second)
-
-			w.Write([]byte(fmt.Sprintf("all done.\n")))
-		})
-	*/
-	return r
+	// Return a success response
+	w.WriteHeader(http.StatusCreated)
 }
 
 // static files from a http.FileSystem.
@@ -238,25 +234,4 @@ func folderStructureReader(folderPath string, basePath string) (FileInfo, error)
 	}
 
 	return folder, nil
-}
-
-// fileServer conveniently sets up a http.fileServer handler to serve
-// static files from a http.FileSystem.
-func fileServer(r chi.Router, path string, root http.FileSystem) {
-	if strings.ContainsAny(path, "{}*") {
-		panic("FileServer does not permit any URL parameters.")
-	}
-
-	if path != "/" && path[len(path)-1] != '/' {
-		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
-		path += "/"
-	}
-	path += "*"
-
-	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
-		fs.ServeHTTP(w, r)
-	})
 }

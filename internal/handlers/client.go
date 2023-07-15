@@ -27,14 +27,15 @@ func ClientRouter() http.Handler {
 	staticFiles := http.FileServer(http.Dir(filepath.Join(spaPath, assetsDir)))
 	r.Handle(assetsDir+"*", http.StripPrefix(assetsDir, staticFiles))
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		indexPath := filepath.Join(spaPath, "index.html")
+	indexPath := filepath.Join(spaPath, "index.html")
+
+	// Serve React Build files
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, indexPath)
 	})
 
 	//? Redirect to client if route not found
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		indexPath := filepath.Join(spaPath, "index.html")
 		http.ServeFile(w, r, indexPath)
 	})
 
