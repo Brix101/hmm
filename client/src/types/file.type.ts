@@ -3,6 +3,7 @@ import z from "zod";
 const baseFileSchema = z.object({
   name: z.string(),
   size: z.number(),
+  path: z.string(),
   fileType: z.string().optional().nullish(),
 });
 
