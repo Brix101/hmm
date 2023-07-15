@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"mime"
@@ -10,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -27,9 +25,11 @@ func FileRouter() http.Handler {
 	workDir, _ := os.Getwd()
 
 	// Specify the relative path to the files folder
-	filesPath := filepath.Join(workDir, "files")
+	filesPath := filepath.Join(workDir, "data")
+	filesDir := http.Dir(filesPath)
+	fileServer(r, "/data", filesDir)
 
-	r.Post("/files", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/files/*", func(w http.ResponseWriter, r *http.Request) {
 		// Parse the JSON request body to retrieve the folder name
 		type FolderRequest struct {
 			Name string `json:"name"`
@@ -45,8 +45,14 @@ func FileRouter() http.Handler {
 			return
 		}
 
+		// Extract the nested route from the request URL
+		path := strings.TrimPrefix(r.URL.Path, "/")
+
+		// Remove "api/files" segment from the path
+		path = strings.TrimPrefix(path, "api/files")
+
 		// Create the new folder
-		newFolderPath := filepath.Join(filesPath, folderReq.Name)
+		newFolderPath := filepath.Join(filesPath+path, folderReq.Name)
 		err = os.Mkdir(newFolderPath, 0755)
 		if err != nil {
 			// Log the error
@@ -88,9 +94,14 @@ func FileRouter() http.Handler {
 		w.WriteHeader(http.StatusCreated)
 	})
 
-	r.Get("/files", func(w http.ResponseWriter, r *http.Request) {
-		// Build the folder structure
-		folderStructure, err := folderStructure(filesPath)
+	r.Get("/files/*", func(w http.ResponseWriter, r *http.Request) {
+		// Extract the nested route from the request URL
+		path := strings.TrimPrefix(r.URL.Path, "/")
+
+		// Remove "api/files" segment from the path
+		path = strings.TrimPrefix(path, "api/files")
+
+		folderStructure, err := folderStructureReader(filesPath + path)
 		if err != nil {
 			// Log the error
 			log.Println("Error building folder structure:", err)
@@ -119,23 +130,44 @@ func FileRouter() http.Handler {
 		w.Write(jsonData)
 	})
 
-	r.Get("/slow", func(w http.ResponseWriter, r *http.Request) {
-		// Simulates some hard work.
-		//
-		// We want this handler to complete successfully during a shutdown signal,
-		// so consider the work here as some background routine to fetch a long running
-		// search query to find as many results as possible, but, instead we cut it short
-		// and respond with what we have so far. How a shutdown is handled is entirely
-		// up to the developer, as some code blocks are preemptible, and others are not.
-		time.Sleep(5 * time.Second)
+	/*
+		r.Get("/slow", func(w http.ResponseWriter, r *http.Request) {
+			// Simulates some hard work.
+			//
+			// We want this handler to complete successfully during a shutdown signal,
+			// so consider the work here as some background routine to fetch a long running
+			// search query to find as many results as possible, but, instead we cut it short
+			// and respond with what we have so far. How a shutdown is handled is entirely
+			// up to the developer, as some code blocks are preemptible, and others are not.
+			time.Sleep(5 * time.Second)
 
-		w.Write([]byte(fmt.Sprintf("all done.\n")))
-	})
-
+			w.Write([]byte(fmt.Sprintf("all done.\n")))
+		})
+	*/
 	return r
 }
 
-func folderStructure(folderPath string) (FileInfo, error) {
+// static files from a http.FileSystem.
+func fileRouteReader(r chi.Router, path string, root http.FileSystem) {
+	if strings.ContainsAny(path, "{}*") {
+		panic("FileServer does not permit any URL parameters.")
+	}
+
+	if path != "/" && path[len(path)-1] != '/' {
+		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
+		path += "/"
+	}
+	path += "*"
+
+	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
+		rctx := chi.RouteContext(r.Context())
+		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
+		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
+		fs.ServeHTTP(w, r)
+	})
+}
+
+func folderStructureReader(folderPath string) (FileInfo, error) {
 	// Get folder information
 	folderInfo, err := os.Stat(folderPath)
 	if err != nil {
@@ -167,7 +199,7 @@ func folderStructure(folderPath string) (FileInfo, error) {
 
 		if fileInfo.IsDir() {
 			// Recursively build folder structure for subfolders
-			subfolder, err := folderStructure(itemPath)
+			subfolder, err := folderStructureReader(itemPath)
 			if err != nil {
 				return FileInfo{}, err
 			}

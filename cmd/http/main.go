@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"home-server/handlers"
+	"home-server/internal/handlers"
 	"log"
 	"net/http"
 	"os"

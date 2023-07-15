@@ -1,5 +1,8 @@
 /files/*
 !/files/.gitkeep
 
+/data/*
+!/data/.gitkeep
+
 
 tmp/
