@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -232,6 +233,23 @@ func folderStructureReader(folderPath string, basePath string) (FileInfo, error)
 			folder.Files = append(folder.Files, file)
 		}
 	}
+
+	// Sort the folder.Files slice by file type for folders, and by name for files
+	sort.Slice(folder.Files, func(i, j int) bool {
+		isFolderI := folder.Files[i].Files != nil && len(folder.Files[i].Files) > 0
+		isFolderJ := folder.Files[j].Files != nil && len(folder.Files[j].Files) > 0
+
+		if isFolderI && !isFolderJ {
+			return true // Folders come before files
+		} else if !isFolderI && isFolderJ {
+			return false // Files come after folders
+		} else if isFolderI && isFolderJ {
+			return folder.Files[i].FileType < folder.Files[j].FileType // Sort folders by file type
+		}
+
+		// Both are files, sort by name
+		return folder.Files[i].Name < folder.Files[j].Name
+	})
 
 	return folder, nil
 }
