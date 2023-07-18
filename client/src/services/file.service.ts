@@ -29,7 +29,7 @@ export const useQueryFile = (filePath: string) => {
     const res = await apiClient.get(`/files/${customerId}`);
     return fileEntitySchema.parse(res.data);
   };
-  return useQuery<FileEntity>([QUERY_FILE_KEY, filePath], () =>
+  return useQuery<FileEntity, AxiosError>([QUERY_FILE_KEY, filePath], () =>
     getCustomer(filePath)
   );
 };

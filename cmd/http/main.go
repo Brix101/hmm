@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"home-server/internal/handlers"
-	"home-server/pkg/db"
 	"log"
 	"net/http"
 	"os"
@@ -22,17 +20,7 @@ import (
 func main() {
 	// The HTTP Server
 	server := &http.Server{Addr: "0.0.0.0:5000", Handler: service()}
-	pool := db.CreateConnectionPool()
 
-	schema := `CREATE TABLE place (
-    country text,
-    city text NULL,
-    telcode integer);`
-
-	// execute a query on the server
-	result, _ := pool.Exec(schema)
-
-	fmt.Println(result)
 	// Server run context
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 

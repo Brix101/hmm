@@ -1,6 +1,4 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { STATIC_URL } from "@/constant/server.constant";
+import FileCard from "@/components/FileCard";
 import { useQueryFile } from "@/services/file.service";
 import { useBoundStore } from "@/store";
 
@@ -10,12 +8,24 @@ const Home = () => {
     setActiveFilePath,
   } = useBoundStore();
 
-  const { data, isLoading } = useQueryFile(activeFilePath ?? "");
+  const { data, isLoading, error } = useQueryFile(activeFilePath ?? "");
 
   const breadCrumbs = activeFilePath?.replace("/", "").split("/");
 
   if (isLoading) {
     return <h1>Loading</h1>;
+  }
+
+  if (error) {
+    return (
+      <div
+        className="relative py-3 px-4 text-red-700 bg-red-100 rounded border border-red-400"
+        role="alert"
+      >
+        <strong className="font-bold">Message: </strong>
+        <span className="block sm:inline">{error.message}</span>
+      </div>
+    );
   }
 
   function handleResetClick() {
@@ -57,10 +67,11 @@ const Home = () => {
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
                 <button
-                  className={`${isActive
+                  className={`${
+                    isActive
                       ? "text-foreground"
                       : "cursor-pointer hover:underline "
-                    }`}
+                  }`}
                   onClick={() => handleBreadCrumbsClick({ index })}
                   disabled={isActive}
                 >
@@ -72,22 +83,9 @@ const Home = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-2 grid-cols-file">
         {data?.files?.map((file, index) => (
-          <Card className="w-[350px] h-[350px]" key={file.name + index}>
-            <CardContent>
-              {file.fileType?.includes("image") ? (
-                <img src={STATIC_URL + file.path} alt={file.name} />
-              ) : (
-                <>{file.name}</>
-              )}
-              {file.files ? (
-                <Button onClick={() => setActiveFilePath(file.path)}>
-                  navigate
-                </Button>
-              ) : undefined}
-            </CardContent>
-          </Card>
+          <FileCard key={file.name + index} file={file} />
         ))}
       </div>
     </>
