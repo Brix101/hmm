@@ -1,13 +1,25 @@
 package services
 
-import "github.com/jmoiron/sqlx"
+import (
+	"fmt"
 
-type UserStorage struct {
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
+)
+
+type UserServices struct {
 	Conn *sqlx.DB
 }
 
-func NewUserStorage(conn *sqlx.DB) *UserStorage {
-	return &UserStorage{Conn: conn}
+func NewUserServices(conn *sqlx.DB) *UserServices {
+	return &UserServices{Conn: conn}
+}
+
+type UserEntity struct {
+	Id       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Email    string    `json:"email"`
+	Password string    `json:"-"`
 }
 
 type NewUser struct {
@@ -16,15 +28,47 @@ type NewUser struct {
 	Password string
 }
 
-func (s *UserStorage) CreateNewUser(data NewUser) (int, error) {
-	res, err := s.Conn.Exec("insert into users (name, email, password) values (?, ?, ?)", data.Name, data.Email, data.Password)
+func (s *UserServices) CreateUser(data NewUser) (*UserEntity, error) {
+	// Generate a new UUID
+	newID := uuid.New().String()
+
+	res, err := s.Conn.Exec("insert into users (id, name, email, password) values (?, ?, ?, ?)", newID, data.Name, data.Email, data.Password)
+	fmt.Println(res)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	id, err := res.LastInsertId()
+	// Fetch the created user from the database using the UUID
+	user, err := s.GetUserByID(uuid.MustParse(newID))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return int(id), nil
+	return user, nil
+}
+
+func (s *UserServices) ListUser() ([]UserEntity, error) {
+	users := []UserEntity{}
+	err := s.Conn.Select(&users, "SELECT id, name, email FROM users")
+	if err != nil {
+		return users, err
+	}
+	return users, nil
+}
+
+func (s *UserServices) GetUserByID(userId uuid.UUID) (*UserEntity, error) {
+	user := UserEntity{}
+	err := s.Conn.Get(&user, "SELECT * FROM users WHERE id=?", userId)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *UserServices) GetUserByEmail(email string) (*UserEntity, error) {
+	user := UserEntity{}
+	err := s.Conn.Get(&user, "SELECT * FROM users WHERE email=?", email)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }

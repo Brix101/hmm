@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"home-server/internal/handlers"
+	"home-server/internal/services"
+	"home-server/pkg/db"
 	"log"
 	"net/http"
 	"os"
@@ -15,11 +17,24 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/jmoiron/sqlx"
 )
+
+var schema = `
+	CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL
+	);
+`
 
 func main() {
 	// The HTTP Server
-	server := &http.Server{Addr: "0.0.0.0:5000", Handler: service()}
+	conn := db.CreateConnectionPool()
+	conn.MustExec(schema)
+
+	server := &http.Server{Addr: "0.0.0.0:5000", Handler: service(conn)}
 
 	// Server run context
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
@@ -58,7 +73,7 @@ func main() {
 	<-serverCtx.Done()
 }
 
-func service() http.Handler {
+func service(conn *sqlx.DB) http.Handler {
 	r := chi.NewRouter()
 	workDir, _ := os.Getwd()
 
@@ -80,13 +95,17 @@ func service() http.Handler {
 	r.Use(middleware.Logger)
 
 	clientRouter := handlers.ClientRouter()
+	userServices := services.NewUserServices(conn)
 
 	r.Mount("/", clientRouter)
 
 	filesResource := handlers.FilesResource{FilesPath: filesPath}
-	userResource := handlers.UsersResource{}
+
+	userResource := handlers.UsersResource{UserServices: userServices}
+	authResource := handlers.AuthResource{UserServices: userServices}
 
 	r.Route("/api", func(r chi.Router) {
+		r.Mount("/", authResource.Routes())
 		r.Mount("/files", filesResource.Routes())
 		r.Mount("/users", userResource.Routes())
 	})
