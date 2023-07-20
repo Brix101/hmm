@@ -2,7 +2,7 @@ import { FileEntity } from "@/types/file.type";
 import { STATIC_URL } from "@/constant/server.constant";
 import { useBoundStore } from "@/store";
 import { cn } from "@/lib/utils";
-import { Folder } from "lucide-react";
+import { Folder, File } from "lucide-react";
 
 interface Props {
   file: FileEntity;
@@ -10,19 +10,21 @@ interface Props {
 
 const FileCard = ({ file }: Props) => {
   const { setPathHistory } = useBoundStore();
-  const isFolder = file.isDir;
+  const isDir = file.isDir;
   const isImage = file.fileType?.includes("image");
 
   const handleNavigate = () => {
-    if (isFolder) {
+    if (isDir) {
       setPathHistory(file.path);
+    } else {
+      window.open(STATIC_URL + file.path, "_blank");
     }
   };
   return (
     <div
       className={cn(
         "h-52 flex flex-col items-center justify-center truncate",
-        isFolder ? "cursor-pointer hover:bg-blue-50" : ""
+        /*  isDir ?  */ "cursor-pointer hover:bg-blue-50" /* : "" */
       )}
       onClick={handleNavigate}
     >
@@ -33,8 +35,10 @@ const FileCard = ({ file }: Props) => {
       {/* )} */}
       {isImage ? (
         <img src={STATIC_URL + file.path} alt={file.name} />
-      ) : (
+      ) : isDir ? (
         <Folder size={170} />
+      ) : (
+        <File size={170} />
       )}
       <span className="truncate">{file.name}</span>
     </div>
