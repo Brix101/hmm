@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -211,6 +212,17 @@ func folderStructureReader(r reader) (FileInfo, error) {
 	if err != nil {
 		return FileInfo{}, err
 	}
+
+	// Sort fileStats based on IsDir and Name
+	sort.SliceStable(fileStats, func(i, j int) bool {
+		if fileStats[i].IsDir() && !fileStats[j].IsDir() {
+			return true
+		}
+		if !fileStats[i].IsDir() && fileStats[j].IsDir() {
+			return false
+		}
+		return fileStats[i].Name() < fileStats[j].Name()
+	})
 
 	// Traverse through folder contents
 	for _, fileStat := range fileStats {
