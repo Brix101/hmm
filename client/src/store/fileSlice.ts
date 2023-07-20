@@ -3,27 +3,27 @@ import { StateCreator } from "zustand";
 
 interface InitialState {
   file: {
-    activeFilePath?: string;
+    pathHistory?: string;
   };
 }
 
 interface Actions {
-  setActiveFilePath: (path?: string) => void;
+  setPathHistory: (path?: string) => void;
 }
 
 export type FileSlice = InitialState & Actions;
 
 const initialState: InitialState = {
   file: {
-    activeFilePath: undefined,
+    pathHistory: undefined,
   },
 };
 
 const fileSlice: StateCreator<StoreState, [], [], FileSlice> = (set) => ({
   ...initialState,
-  setActiveFilePath: (fileUrls) =>
+  setPathHistory: (fileUrls) =>
     set(() => ({
-      file: { activeFilePath: fileUrls },
+      file: { pathHistory: fileUrls },
     })),
 });
 

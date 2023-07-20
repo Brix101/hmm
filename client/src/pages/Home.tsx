@@ -4,13 +4,13 @@ import { useBoundStore } from "@/store";
 
 const Home = () => {
   const {
-    file: { activeFilePath },
-    setActiveFilePath,
+    file: { pathHistory },
+    setPathHistory: setActiveFilePath,
   } = useBoundStore();
 
-  const { data, isLoading, error } = useQueryFile(activeFilePath ?? "");
+  const { data, isLoading, error } = useQueryFile(pathHistory ?? "");
 
-  const breadCrumbs = activeFilePath?.replace("/", "").split("/");
+  const breadCrumbs = pathHistory?.replace("/", "").split("/");
 
   if (isLoading) {
     return <h1>Loading</h1>;
@@ -67,11 +67,10 @@ const Home = () => {
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
                 <button
-                  className={`${
-                    isActive
+                  className={`${isActive
                       ? "text-foreground"
                       : "cursor-pointer hover:underline "
-                  }`}
+                    }`}
                   onClick={() => handleBreadCrumbsClick({ index })}
                   disabled={isActive}
                 >

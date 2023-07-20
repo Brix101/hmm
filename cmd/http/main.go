@@ -67,7 +67,7 @@ func service() http.Handler {
 	filesDir := http.Dir(filesPath)
 	// Set up CORS middleware
 	cors := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://190.160.15.44:5173"}, // Add your allowed origins here
+		AllowedOrigins:   []string{"http://localhost:5173", "http://192.168.254.180:5173"}, // Add your allowed origins here
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},

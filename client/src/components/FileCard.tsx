@@ -9,19 +9,19 @@ interface Props {
 }
 
 const FileCard = ({ file }: Props) => {
-  const { setActiveFilePath } = useBoundStore();
+  const { setPathHistory } = useBoundStore();
   const isFolder = file.files;
   const isImage = file.fileType?.includes("image");
 
   const handleNavigate = () => {
     if (isFolder) {
-      setActiveFilePath(file.path);
+      setPathHistory(file.path);
     }
   };
   return (
     <div
       className={cn(
-        "h-52 flex flex-col items-center border border-gray-50 justify-center truncate",
+        "h-52 flex flex-col items-center justify-center truncate",
         isFolder ? "cursor-pointer hover:bg-blue-50" : ""
       )}
       onClick={handleNavigate}
