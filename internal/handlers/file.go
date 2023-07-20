@@ -8,21 +8,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 )
-
-type FileInfo struct {
-	Name      string     `json:"name"`
-	Size      int64      `json:"size"`
-	FileType  string     `json:"fileType,omitempty"`
-	PATH      string     `json:"path,omitempty"`
-	Files     []FileInfo `json:"files,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-}
 
 type FilesResource struct{ FilesPath string }
 
@@ -50,10 +40,24 @@ func (rs FilesResource) List(w http.ResponseWriter, r *http.Request) {
 	// Extract the nested route from the request URL
 	path := strings.TrimPrefix(r.URL.Path, "/")
 
+	// Get the "hidden" query parameter, and set default value to true
+	hiddenParam := r.URL.Query().Get("hidden")
+	hidden := true
+
+	// Check if "hiddenParam" exists and if it's "false", set "hidden" to false
+	if hiddenParam == "false" {
+		hidden = false
+	}
 	// Remove "api/files" segment from the path
 	path = strings.TrimPrefix(path, "api/files")
 
-	folderStructure, err := folderStructureReader(rs.FilesPath+path, rs.FilesPath)
+	newReader := reader{
+		folderPath: rs.FilesPath + path,
+		basePath:   rs.FilesPath,
+		hidden:     hidden,
+	}
+
+	folderStructure, err := folderStructureReader(newReader)
 	if err != nil {
 		// Log the error
 		log.Println("Error building folder structure:", err)
@@ -167,43 +171,64 @@ func fileRouteReader(r chi.Router, path string, root http.FileSystem) {
 	})
 }
 
-func folderStructureReader(folderPath string, basePath string) (FileInfo, error) {
+type FileInfo struct {
+	PATH     string     `json:"path,omitempty"`
+	Name     string     `json:"name"`
+	Size     int64      `json:"size"`
+	FileType string     `json:"fileType,omitempty"`
+	Files    []FileInfo `json:"files,omitempty"`
+	IsDir    bool       `json:"isDir"`
+	ModTime  time.Time  `json:"modTime"`
+}
+
+type reader struct {
+	folderPath string
+	basePath   string
+	hidden     bool
+}
+
+func folderStructureReader(r reader) (FileInfo, error) {
 	// Get folder information
-	folderInfo, err := os.Stat(folderPath)
+	folderStat, err := os.Stat(r.folderPath)
 	if err != nil {
 		return FileInfo{}, err
 	}
 
 	// Create FileInfo for the folder
-	trimmedFolderPath := strings.TrimPrefix(folderPath, basePath)
+	trimmedFolderPath := strings.TrimPrefix(r.folderPath, r.basePath)
 
 	folder := FileInfo{
-		Name:      folderInfo.Name(),
-		Size:      folderInfo.Size(),
-		PATH:      trimmedFolderPath,
-		CreatedAt: folderInfo.ModTime(),
-		Files:     []FileInfo{},
+		PATH:    trimmedFolderPath,
+		Name:    folderStat.Name(),
+		Size:    folderStat.Size(),
+		ModTime: folderStat.ModTime(),
+		IsDir:   true,
+		Files:   []FileInfo{},
 	}
 
 	// Read folder contents
-	fileInfos, err := ioutil.ReadDir(folderPath)
+	fileStats, err := ioutil.ReadDir(r.folderPath)
 	if err != nil {
 		return FileInfo{}, err
 	}
 
 	// Traverse through folder contents
-	for _, fileInfo := range fileInfos {
-		// Skip hidden files and folders
-		if fileInfo.Name()[0] == '.' {
+	for _, fileStat := range fileStats {
+		// Skip hidden files and folders if "hidden" is true and exclude .git if hidden is false
+		if (r.hidden && fileStat.Name()[0] == '.') || (!r.hidden && strings.Contains(fileStat.Name(), ".git")) {
 			continue
-		}
+		} // Build file/folder path
+		itemPath := filepath.Join(r.folderPath, fileStat.Name())
 
-		// Build file/folder path
-		itemPath := filepath.Join(folderPath, fileInfo.Name())
-
-		if fileInfo.IsDir() {
+		if fileStat.IsDir() {
 			// Recursively build folder structure for subfolders
-			subfolder, err := folderStructureReader(itemPath, basePath)
+			subReader := reader{
+				folderPath: itemPath,
+				basePath:   r.basePath,
+				hidden:     r.hidden,
+			}
+
+			subfolder, err := folderStructureReader(subReader)
 			if err != nil {
 				return FileInfo{}, err
 			}
@@ -212,16 +237,17 @@ func folderStructureReader(folderPath string, basePath string) (FileInfo, error)
 			folder.Files = append(folder.Files, subfolder)
 		} else {
 			// Get the file type and MIME type
-			fileType := filepath.Ext(fileInfo.Name())
+			fileType := filepath.Ext(fileStat.Name())
 			mimeType := mime.TypeByExtension(fileType)
 
 			// Create FileInfo for the file
 			file := FileInfo{
-				Name:      fileInfo.Name(),
-				Size:      fileInfo.Size(),
-				PATH:      folder.PATH + "/" + fileInfo.Name(),
-				FileType:  fileType,
-				CreatedAt: fileInfo.ModTime(),
+				Name:     fileStat.Name(),
+				Size:     fileStat.Size(),
+				PATH:     folder.PATH + "/" + fileStat.Name(),
+				FileType: fileType,
+				ModTime:  fileStat.ModTime(),
+				IsDir:    false,
 			}
 
 			// Set the MIME type if available
@@ -233,23 +259,6 @@ func folderStructureReader(folderPath string, basePath string) (FileInfo, error)
 			folder.Files = append(folder.Files, file)
 		}
 	}
-
-	// Sort the folder.Files slice by file type for folders, and by name for files
-	sort.Slice(folder.Files, func(i, j int) bool {
-		isFolderI := folder.Files[i].Files != nil && len(folder.Files[i].Files) > 0
-		isFolderJ := folder.Files[j].Files != nil && len(folder.Files[j].Files) > 0
-
-		if isFolderI && !isFolderJ {
-			return true // Folders come before files
-		} else if !isFolderI && isFolderJ {
-			return false // Files come after folders
-		} else if isFolderI && isFolderJ {
-			return folder.Files[i].FileType < folder.Files[j].FileType // Sort folders by file type
-		}
-
-		// Both are files, sort by name
-		return folder.Files[i].Name < folder.Files[j].Name
-	})
 
 	return folder, nil
 }

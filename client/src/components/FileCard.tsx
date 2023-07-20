@@ -10,7 +10,7 @@ interface Props {
 
 const FileCard = ({ file }: Props) => {
   const { setPathHistory } = useBoundStore();
-  const isFolder = file.files;
+  const isFolder = file.isDir;
   const isImage = file.fileType?.includes("image");
 
   const handleNavigate = () => {
