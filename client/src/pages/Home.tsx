@@ -1,4 +1,5 @@
 import FileCard from "@/components/FileCard";
+import AddFileBox from "@/components/file/AddFileBox";
 import { cn } from "@/lib/utils";
 import { useQueryFile } from "@/services/file.service";
 import { useBoundStore } from "@/store";
@@ -34,7 +35,7 @@ const Home = () => {
   }
 
   return (
-    <>
+    <section className="container">
       <div>
         <div className="flex items-center space-x-1 text-sm capitalize text-muted-foreground">
           {breadCrumbs?.map((url, index) => {
@@ -73,13 +74,13 @@ const Home = () => {
           })}
         </div>
       </div>
-
+      <AddFileBox />
       <div className="grid gap-2 grid-cols-file">
         {data?.files?.map((file, index) => (
           <FileCard key={file.name + index} file={file} />
         ))}
       </div>
-    </>
+    </section>
   );
 };
 
