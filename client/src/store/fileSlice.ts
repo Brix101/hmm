@@ -3,19 +3,19 @@ import { StateCreator } from "zustand";
 
 interface InitialState {
   file: {
-    pathHistory?: string;
+    pathHistory: string;
   };
 }
 
 interface Actions {
-  setPathHistory: (path?: string) => void;
+  setPathHistory: (path: string) => void;
 }
 
 export type FileSlice = InitialState & Actions;
 
 const initialState: InitialState = {
   file: {
-    pathHistory: undefined,
+    pathHistory: "",
   },
 };
 

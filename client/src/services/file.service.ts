@@ -25,8 +25,8 @@ export const useGetFiles = (
 };
 
 export const useQueryFile = (filePath: string) => {
-  const getCustomer = async (customerId: string) => {
-    const res = await apiClient.get(`/files/${customerId}`);
+  const getCustomer = async (path: string) => {
+    const res = await apiClient.get(`/files/${path}`);
     return fileEntitySchema.parse(res.data);
   };
   return useQuery<FileEntity, AxiosError>([QUERY_FILE_KEY, filePath], () =>

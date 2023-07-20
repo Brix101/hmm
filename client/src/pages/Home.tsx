@@ -1,16 +1,17 @@
 import FileCard from "@/components/FileCard";
+import { cn } from "@/lib/utils";
 import { useQueryFile } from "@/services/file.service";
 import { useBoundStore } from "@/store";
 
 const Home = () => {
   const {
     file: { pathHistory },
-    setPathHistory: setActiveFilePath,
+    setPathHistory,
   } = useBoundStore();
 
-  const { data, isLoading, error } = useQueryFile(pathHistory ?? "");
+  const { data, isLoading, error } = useQueryFile(pathHistory);
 
-  const breadCrumbs = pathHistory?.replace("/", "").split("/");
+  const breadCrumbs = pathHistory?.split("/");
 
   if (isLoading) {
     return <h1>Loading</h1>;
@@ -28,27 +29,18 @@ const Home = () => {
     );
   }
 
-  function handleResetClick() {
-    setActiveFilePath(undefined);
-  }
-
   function handleBreadCrumbsClick({ index }: { index: number }) {
-    setActiveFilePath(`/${breadCrumbs?.slice(0, index + 1).join("/")}`);
+    setPathHistory(`${breadCrumbs?.slice(0, index + 1).join("/")}`);
   }
 
   return (
     <>
       <div>
         <div className="flex items-center space-x-1 text-sm capitalize text-muted-foreground">
-          <div
-            className="cursor-pointer hover:underline truncate"
-            onClick={handleResetClick}
-          >
-            Files
-          </div>
           {breadCrumbs?.map((url, index) => {
             const isActive = breadCrumbs?.length - 1 === index;
 
+            const urlName = url.length > 1 ? url : "Files";
             return (
               <div className="flex items-center" key={index}>
                 <svg
@@ -61,7 +53,7 @@ const Home = () => {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="w-4 h-4"
+                  className={cn("w-4 h-4", index === 0 ? "hidden" : "")}
                   aria-hidden="true"
                 >
                   <polyline points="9 18 15 12 9 6"></polyline>
@@ -74,7 +66,7 @@ const Home = () => {
                   onClick={() => handleBreadCrumbsClick({ index })}
                   disabled={isActive}
                 >
-                  {url}
+                  {urlName}
                 </button>
               </div>
             );
