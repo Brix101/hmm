@@ -17,15 +17,15 @@ import { cn } from "@/lib/utils";
 
 function AddFileBox() {
   const onDrop = useCallback((acceptedFiles: FileWithPath[]) => {
-    const file = acceptedFiles;
+    // const file = acceptedFiles;
     console.log({ acceptedFiles });
   }, []);
   const {
     getRootProps,
     getInputProps,
     isDragActive,
-    isDragAccept,
-    isDragReject,
+    // isDragAccept,
+    // isDragReject,
   } = useDropzone({
     onDrop,
     multiple: true,
