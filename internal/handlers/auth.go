@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"home-server/internal/services"
+	"home-server/pkg/utils"
 	"net/http"
 	"strings"
 	"time"
@@ -38,7 +39,17 @@ func (rs AuthResource) SignIn(w http.ResponseWriter, r *http.Request) {
 	var body signInRequestBody
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
-		http.Error(w, "Failed to parse request body", http.StatusUnprocessableEntity)
+		errorMap := utils.NewErrorMap()
+
+		errorMap.Add("root", utils.ErrorData{
+			Message: "Failed to parse request body",
+			Type:    "invalid_type",
+		})
+		errorJSON, _ := errorMap.Json()
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write(errorJSON)
 		return
 	}
 
@@ -46,26 +57,20 @@ func (rs AuthResource) SignIn(w http.ResponseWriter, r *http.Request) {
 	validate := validator.New()
 	err = validate.Struct(body)
 	if err != nil {
-		// Initialize the map to hold the validation errors
-		validationErrors := make(map[string][]string)
-
+		errorMap := utils.NewErrorMap()
 		// Get the validation errors from the validator and store them in the map
 		for _, err := range err.(validator.ValidationErrors) {
 			// Make the field name lowercase
 			fieldName := strings.ToLower(err.Field())
-
-			// Append the error message to the field's slice in the map
 			errorMessage := fmt.Sprintf("%s is %s", fieldName, err.Tag())
-			validationErrors[fieldName] = append(validationErrors[fieldName], errorMessage)
+
+			errorMap.Add(fieldName, utils.ErrorData{
+				Message: errorMessage,
+				Type:    "invalid_type",
+			})
 		}
 
-		// Create the error response JSON
-		errorResponse := ErrorResponse{
-			Errors: validationErrors,
-		}
-
-		// Marshal the error response JSON
-		errorJSON, _ := json.Marshal(errorResponse)
+		errorJSON, _ := errorMap.Json()
 
 		// Return the validation errors in the HTTP response as JSON
 		w.Header().Set("Content-Type", "application/json")
@@ -76,15 +81,35 @@ func (rs AuthResource) SignIn(w http.ResponseWriter, r *http.Request) {
 
 	existingUser, err := rs.UserServices.GetByEmail(body.Email)
 	if err != nil {
-		// Handle the error, such as "user not found"
-		http.Error(w, "User not found", http.StatusNotFound)
+		errorMap := utils.NewErrorMap()
+
+		errorMap.Add("email", utils.ErrorData{
+			Message: "User not Found",
+			Type:    "invalid_type",
+		})
+		errorJSON, _ := errorMap.Json()
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(errorJSON)
 		return
 	}
 
 	// Compare the password from the database with the provided password
 	if existingUser.Password != body.Password {
-		// Passwords do not match
-		http.Error(w, "Incorrect Password", http.StatusUnauthorized)
+		errorMap := utils.NewErrorMap()
+
+		errorMap.Add("password", utils.ErrorData{
+			Message: "Incorrect Password",
+			Type:    "invalid_type",
+		})
+
+		errorJSON, _ := errorMap.Json()
+
+		// Return the validation errors in the HTTP response as JSON
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(errorJSON)
 		return
 	}
 	// Store the user ID in a cookie
