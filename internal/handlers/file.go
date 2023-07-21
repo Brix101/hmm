@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"home-server/pkg/utils"
+	"io"
 	"io/ioutil"
 	"log"
 	"mime"
@@ -87,69 +90,166 @@ func (rs FilesResource) List(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
-	// Parse the JSON request body to retrieve the folder name
-	type FolderRequest struct {
-		Name string `json:"name"`
-	}
-	var folderReq FolderRequest
-	err := json.NewDecoder(r.Body).Decode(&folderReq)
-	if err != nil {
-		// Log the error
-		log.Println("Error parsing request body:", err)
+const MAX_UPLOAD_SIZE = 1024 * 1024 * 10 // 1MB
 
-		// Return an appropriate response
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
+	// Clear temporary files before processing new uploads
+	clearTempFiles()
+
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	path = strings.TrimPrefix(path, "api/files")
+	activePath := rs.FilesPath + path
+	newReader := reader{
+		folderPath: rs.FilesPath + path,
+		basePath:   rs.FilesPath,
+		hidden:     false,
+	}
+
+	// 32 MB is the default used by FormFile()
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Retrieve the name value from the form data
+	name := r.FormValue("name")
 
-	// Extract the nested route from the request URL
-	path := strings.TrimPrefix(r.URL.Path, "/")
+	fmt.Println(name)
+	// They are accessible only after ParseMultipartForm is called
+	files := r.MultipartForm.File["files"]
+	if name == "" && len(files) <= 1 {
+		errorMap := utils.NewErrorMap()
 
-	// Remove "api/files" segment from the path
-	path = strings.TrimPrefix(path, "api/files")
+		errorMap.Add("root", utils.ErrorData{
+			Message: "Include name or files",
+			Type:    "invalid_type",
+		})
 
-	// Create the new folder
-	newFolderPath := filepath.Join(rs.FilesPath+path, folderReq.Name)
-	err = os.Mkdir(newFolderPath, 0755)
-	if err != nil {
-		// Log the error
-		log.Println("Error creating folder:", err)
+		errorJSON, _ := errorMap.Json()
 
-		// Split the error message
-		errorMessage := strings.SplitN(err.Error(), ":", 2)
-		errorDetail := ""
-		if len(errorMessage) > 1 {
-			errorDetail = strings.TrimSpace(errorMessage[1])
-		} else {
-			errorDetail = strings.TrimSpace(errorMessage[0])
-		}
-
-		// Create an error response
-		errorResponse := struct {
-			Detail string `json:"detail"`
-		}{
-			Detail: errorDetail,
-		}
-		jsonResponse, err := json.Marshal(errorResponse)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write(errorJSON)
+		return
+	}
+	for _, fileHeader := range files {
+		// Open the file
+		file, err := fileHeader.Open()
 		if err != nil {
-			// Log the error
-			log.Println("Error encoding JSON:", err)
-
-			// Return an appropriate response
-			http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+			log.Println("Error open file:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// Set response headers
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(jsonResponse)
+		defer file.Close()
+
+		buff := make([]byte, 512)
+		_, err = file.Read(buff)
+		if err != nil {
+
+			log.Println("Error read file:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		_, err = file.Seek(0, io.SeekStart)
+		if err != nil {
+
+			log.Println("Error seek file:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Create the destination file in the activePath directory
+		destinationFile, err := os.Create(filepath.Join(activePath, fileHeader.Filename))
+		if err != nil {
+
+			log.Println("Error creating path:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer destinationFile.Close()
+
+		// Copy the contents of the uploaded file to the destination file
+		_, err = io.Copy(destinationFile, file)
+		if err != nil {
+
+			log.Println("Error copy file:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+	}
+
+	if name != "" {
+		// // Create the new folder
+		newFolderPath := filepath.Join(activePath, name)
+		err := os.Mkdir(newFolderPath, 0755)
+		if err != nil {
+			// Log the error
+			log.Println("Error creating folder:", err)
+
+			errorMap := utils.NewErrorMap()
+
+			errorMap.Add("name", utils.ErrorData{
+				Message: err.Error(),
+				Type:    "invalid_type",
+			})
+
+			errorJSON, _ := errorMap.Json()
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write(errorJSON)
+			return
+		}
+	}
+
+	folderStructure, err := folderStructureReader(newReader)
+	if err != nil {
+		// Log the error
+		log.Println("Error building folder structure:", err)
+
+		// Return an appropriate response
+		http.Error(w, "Error building folder structure", http.StatusInternalServerError)
 		return
 	}
 
-	// Return a success response
-	w.WriteHeader(http.StatusCreated)
+	// Convert folder structure to JSON
+	jsonData, err := json.Marshal(folderStructure)
+	if err != nil {
+		// Log the error
+		log.Println("Error encoding JSON:", err)
+
+		// Return an appropriate response
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Set response headers
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	// Write the JSON response
+	w.Write(jsonData)
+}
+
+func clearTempFiles() {
+	// Get a list of files that start with "multipart" in the /tmp directory
+	files, err := filepath.Glob("/tmp/multipart*")
+	if err != nil {
+		fmt.Println("Error listing files:", err)
+		return
+	}
+
+	// Remove each file
+	for _, file := range files {
+		err := os.RemoveAll(file)
+		if err != nil {
+			fmt.Println("Error removing file:", file, err)
+		} else {
+			fmt.Println("Removed file:", file)
+		}
+	}
 }
 
 // static files from a http.FileSystem.
