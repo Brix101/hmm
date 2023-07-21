@@ -60,10 +60,11 @@ const Home = () => {
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
                 <button
-                  className={`${isActive
+                  className={`${
+                    isActive
                       ? "text-foreground"
                       : "cursor-pointer hover:underline "
-                    }`}
+                  }`}
                   onClick={() => handleBreadCrumbsClick({ index })}
                   disabled={isActive}
                 >
