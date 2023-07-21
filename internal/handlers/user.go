@@ -36,7 +36,7 @@ func (rs UsersResource) Routes() chi.Router {
 }
 
 func (rs UsersResource) List(w http.ResponseWriter, r *http.Request) {
-	users, err := rs.UserServices.ListUser()
+	users, err := rs.UserServices.GetAll()
 	if err != nil {
 		// Log the error
 		log.Println("Error getting users:", err)

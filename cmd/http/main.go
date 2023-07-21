@@ -20,19 +20,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-var schema = `
-	CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL
-	);
-`
-
 func main() {
 	// The HTTP Server
 	conn := db.CreateConnectionPool()
-	conn.MustExec(schema)
 
 	server := &http.Server{Addr: "0.0.0.0:5000", Handler: service(conn)}
 
@@ -46,7 +36,8 @@ func main() {
 		<-sig
 
 		// Shutdown signal with grace period of 30 seconds
-		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second)
+		shutdownCtx, shutdownCancel := context.WithTimeout(serverCtx, 30*time.Second)
+		defer shutdownCancel() // Call the cancel function when the shutdown function finishes
 
 		go func() {
 			<-shutdownCtx.Done()
@@ -64,6 +55,7 @@ func main() {
 	}()
 
 	// Run the server
+	log.Println("🚀🚀🚀 Server at http://" + server.Addr)
 	err := server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
@@ -96,6 +88,7 @@ func service(conn *sqlx.DB) http.Handler {
 
 	clientRouter := handlers.ClientRouter()
 	userServices := services.NewUserServices(conn)
+	featureServices := services.NewFeatureServices(conn)
 
 	r.Mount("/", clientRouter)
 
@@ -103,11 +96,13 @@ func service(conn *sqlx.DB) http.Handler {
 
 	userResource := handlers.UsersResource{UserServices: userServices}
 	authResource := handlers.AuthResource{UserServices: userServices}
+	featureResource := handlers.FeaturesResource{FeatureServices: featureServices}
 
 	r.Route("/api", func(r chi.Router) {
 		r.Mount("/", authResource.Routes())
 		r.Mount("/files", filesResource.Routes())
 		r.Mount("/users", userResource.Routes())
+		r.Mount("/features", featureResource.Routes())
 	})
 
 	FileServer(r, "/data/files", filesDir)

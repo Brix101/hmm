@@ -11,7 +11,19 @@ type UserServices struct {
 	Conn *sqlx.DB
 }
 
+var schema = `
+	CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL
+	);
+`
+
 func NewUserServices(conn *sqlx.DB) *UserServices {
+	// create the table users if not exists
+	conn.MustExec(schema)
+
 	return &UserServices{Conn: conn}
 }
 
@@ -38,7 +50,7 @@ func (s *UserServices) CreateUser(data NewUser) (*UserEntity, error) {
 		return nil, err
 	}
 	// Fetch the created user from the database using the UUID
-	user, err := s.GetUserByID(uuid.MustParse(newID))
+	user, err := s.GetByID(uuid.MustParse(newID))
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +58,7 @@ func (s *UserServices) CreateUser(data NewUser) (*UserEntity, error) {
 	return user, nil
 }
 
-func (s *UserServices) ListUser() ([]UserEntity, error) {
+func (s *UserServices) GetAll() ([]UserEntity, error) {
 	users := []UserEntity{}
 	err := s.Conn.Select(&users, "SELECT id, name, email FROM users")
 	if err != nil {
@@ -55,7 +67,7 @@ func (s *UserServices) ListUser() ([]UserEntity, error) {
 	return users, nil
 }
 
-func (s *UserServices) GetUserByID(userId uuid.UUID) (*UserEntity, error) {
+func (s *UserServices) GetByID(userId uuid.UUID) (*UserEntity, error) {
 	user := UserEntity{}
 	err := s.Conn.Get(&user, "SELECT * FROM users WHERE id=?", userId)
 	if err != nil {
@@ -64,7 +76,7 @@ func (s *UserServices) GetUserByID(userId uuid.UUID) (*UserEntity, error) {
 	return &user, nil
 }
 
-func (s *UserServices) GetUserByEmail(email string) (*UserEntity, error) {
+func (s *UserServices) GetByEmail(email string) (*UserEntity, error) {
 	user := UserEntity{}
 	err := s.Conn.Get(&user, "SELECT * FROM users WHERE email=?", email)
 	if err != nil {

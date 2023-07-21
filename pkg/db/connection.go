@@ -1,7 +1,7 @@
 package db
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -14,7 +14,7 @@ func CreateConnectionPool() *sqlx.DB {
 	if err != nil {
 		panic(err)
 	} else {
-		fmt.Println("DB CONNECTED")
+		log.Println("✅✅✅ Database connection established")
 	}
 
 	return db

@@ -74,7 +74,7 @@ func (rs AuthResource) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existingUser, err := rs.UserServices.GetUserByEmail(body.Email)
+	existingUser, err := rs.UserServices.GetByEmail(body.Email)
 	if err != nil {
 		// Handle the error, such as "user not found"
 		http.Error(w, "User not found", http.StatusNotFound)
@@ -127,7 +127,7 @@ func (rs AuthResource) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch the user from the database using the user ID
-	existingUser, err := rs.UserServices.GetUserByID(userID)
+	existingUser, err := rs.UserServices.GetByID(userID)
 	if err != nil {
 		// Handle the error, such as "user not found"
 		http.Error(w, "User not found", http.StatusNotFound)
