@@ -96,7 +96,7 @@ const MAX_UPLOAD_SIZE = 1024 * 1024 * 10 // 1MB
 
 func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
 	errors := utils.NewErrors(w)
-	clearTempFiles()
+	// clearTempFiles()
 
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	path = strings.TrimPrefix(path, "api/files")
@@ -122,7 +122,8 @@ func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
 
 	// They are accessible only after ParseMultipartForm is called
 	files := r.MultipartForm.File["files"]
-	if name == "" && len(files) <= 1 {
+	fmt.Println(name, len(files), name == "" && len(files) <= 0)
+	if name == "" && len(files) <= 0 {
 		errors.HttpStatus(http.StatusUnprocessableEntity)
 		errors.Add("root", utils.Error{
 			Message: "Either 'name' or 'files' field is required",
