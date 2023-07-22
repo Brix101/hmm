@@ -2,18 +2,16 @@ package main
 
 import (
 	"context"
-	"home-server/internal/handlers"
-	"home-server/internal/middlewares"
-	"home-server/internal/services"
-	"home-server/pkg/db"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/Brix101/network-file-manager/internals/database"
+	"github.com/Brix101/network-file-manager/internals/middlewares"
+	"github.com/Brix101/network-file-manager/pkg"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -22,7 +20,7 @@ import (
 
 func main() {
 	// The HTTP Server
-	conn := db.CreateConnectionPool()
+	conn := database.CreateConnectionPool()
 
 	server := &http.Server{Addr: "0.0.0.0:5000", Handler: service(conn)}
 
@@ -67,11 +65,6 @@ func main() {
 
 func service(conn *sqlx.DB) http.Handler {
 	r := chi.NewRouter()
-	workDir, _ := os.Getwd()
-
-	// Specify the relative path to the files folder
-	filesPath := filepath.Join(workDir, "data")
-	filesDir := http.Dir(filesPath)
 	// Set up CORS middleware
 	cors := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173", "http://192.168.254.180:5173"}, // Add your allowed origins here
@@ -87,25 +80,7 @@ func service(conn *sqlx.DB) http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middlewares.ErrorHandler)
 
-	clientRouter := handlers.ClientRouter()
-	userServices := services.NewUserServices(conn)
-	featureServices := services.NewFeatureServices(conn)
+	packages := pkg.Initialize(r, conn)
 
-	filesResource := handlers.FilesResource{FilesPath: filesPath}
-
-	userResource := handlers.UsersResource{UserServices: userServices}
-	authResource := handlers.AuthResource{UserServices: userServices}
-	featureResource := handlers.FeaturesResource{FeatureServices: featureServices}
-
-	r.Mount("/", clientRouter)
-	r.Route("/api", func(r chi.Router) {
-		r.Mount("/", authResource.Routes())
-		r.Mount("/files", filesResource.Routes())
-		r.Mount("/users", userResource.Routes())
-		r.Mount("/features", featureResource.Routes())
-	})
-
-	filesResource.Serve(r, "/data/files", filesDir)
-
-	return r
+	return packages
 }

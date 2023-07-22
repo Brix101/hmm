@@ -1,12 +1,10 @@
-package handlers
+package files
 
 import (
 	"encoding/json"
 	"fmt"
-	"home-server/pkg/utils"
 	"io"
 	"io/ioutil"
-	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -15,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Brix101/network-file-manager/internals/utils"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -84,37 +83,19 @@ func (rs FilesResource) List(w http.ResponseWriter, r *http.Request) {
 
 	folderStructure, err := folderStructureReader(newReader)
 	if err != nil {
-		// Log the error
-		log.Println("Error building folder structure:", err)
-
-		// Return an appropriate response
-		http.Error(w, "Error building folder structure", http.StatusInternalServerError)
-		return
+		panic("Error building folder structure:" + err.Error())
 	}
 
-	// Convert folder structure to JSON
-	jsonData, err := json.Marshal(folderStructure)
-	if err != nil {
-		// Log the error
-		log.Println("Error encoding JSON:", err)
+	jsonData := folderStructure.ToJSON()
 
-		// Return an appropriate response
-		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// Set response headers
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	// Write the JSON response
 	w.Write(jsonData)
 }
 
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 10 // 1MB
 
 func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
-	// Clear temporary files before processing new uploads
+	errors := utils.NewErrors(w)
 	clearTempFiles()
 
 	path := strings.TrimPrefix(r.URL.Path, "/")
@@ -128,7 +109,12 @@ func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
 
 	// 32 MB is the default used by FormFile()
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errors.HttpStatus(http.StatusInternalServerError)
+		errors.Add("root", utils.Error{
+			Message: err.Error(),
+			Type:    "invalid_type",
+		})
+		errors.Raise()
 		return
 	}
 	// Retrieve the name value from the form data
@@ -137,26 +123,25 @@ func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
 	// They are accessible only after ParseMultipartForm is called
 	files := r.MultipartForm.File["files"]
 	if name == "" && len(files) <= 1 {
-		errorMap := utils.NewErrorMap()
-
-		errorMap.Add("root", utils.ErrorData{
-			Message: "Include name or files",
+		errors.HttpStatus(http.StatusUnprocessableEntity)
+		errors.Add("root", utils.Error{
+			Message: "Either 'name' or 'files' field is required",
 			Type:    "invalid_type",
 		})
-
-		errorJSON, _ := errorMap.Json()
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write(errorJSON)
+		errors.Raise()
 		return
 	}
+
 	for _, fileHeader := range files {
 		// Open the file
 		file, err := fileHeader.Open()
 		if err != nil {
-			log.Println("Error open file:", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			errors.HttpStatus(http.StatusInternalServerError)
+			errors.Add("root", utils.Error{
+				Message: "Error open file:" + err.Error(),
+				Type:    "invalid_type",
+			})
+			errors.Raise()
 			return
 		}
 
@@ -165,26 +150,35 @@ func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
 		buff := make([]byte, 512)
 		_, err = file.Read(buff)
 		if err != nil {
-
-			log.Println("Error read file:", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			errors.HttpStatus(http.StatusInternalServerError)
+			errors.Add("root", utils.Error{
+				Message: "Error read file:" + err.Error(),
+				Type:    "invalid_type",
+			})
+			errors.Raise()
 			return
 		}
 
 		_, err = file.Seek(0, io.SeekStart)
 		if err != nil {
-
-			log.Println("Error seek file:", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			errors.HttpStatus(http.StatusInternalServerError)
+			errors.Add("root", utils.Error{
+				Message: "Error seek file:" + err.Error(),
+				Type:    "invalid_type",
+			})
+			errors.Raise()
 			return
 		}
 
 		// Create the destination file in the activePath directory
 		destinationFile, err := os.Create(filepath.Join(activePath, fileHeader.Filename))
 		if err != nil {
-
-			log.Println("Error creating path:", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			errors.HttpStatus(http.StatusInternalServerError)
+			errors.Add("root", utils.Error{
+				Message: "Error creating path:" + err.Error(),
+				Type:    "invalid_type",
+			})
+			errors.Raise()
 			return
 		}
 		defer destinationFile.Close()
@@ -192,64 +186,38 @@ func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
 		// Copy the contents of the uploaded file to the destination file
 		_, err = io.Copy(destinationFile, file)
 		if err != nil {
-
-			log.Println("Error copy file:", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			errors.HttpStatus(http.StatusInternalServerError)
+			errors.Add("root", utils.Error{
+				Message: "Error copying file:" + err.Error(),
+				Type:    "invalid_type",
+			})
+			errors.Raise()
 			return
 		}
 
 	}
 
 	if name != "" {
-		// // Create the new folder
 		newFolderPath := filepath.Join(activePath, name)
 		err := os.Mkdir(newFolderPath, 0755)
 		if err != nil {
-			// Log the error
-			log.Println("Error creating folder:", err)
-
-			errorMap := utils.NewErrorMap()
-
-			errorMap.Add("name", utils.ErrorData{
+			errors.HttpStatus(http.StatusInternalServerError)
+			errors.Add("root", utils.Error{
 				Message: err.Error(),
 				Type:    "invalid_type",
 			})
-
-			errorJSON, _ := errorMap.Json()
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write(errorJSON)
+			errors.Raise()
 			return
 		}
 	}
 
 	folderStructure, err := folderStructureReader(newReader)
 	if err != nil {
-		// Log the error
-		log.Println("Error building folder structure:", err)
-
-		// Return an appropriate response
-		http.Error(w, "Error building folder structure", http.StatusInternalServerError)
-		return
+		panic("Error building folder structure:" + err.Error())
 	}
 
-	// Convert folder structure to JSON
-	jsonData, err := json.Marshal(folderStructure)
-	if err != nil {
-		// Log the error
-		log.Println("Error encoding JSON:", err)
-
-		// Return an appropriate response
-		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// Set response headers
+	jsonData := folderStructure.ToJSON()
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	// Write the JSON response
 	w.Write(jsonData)
 }
 
@@ -306,6 +274,15 @@ type reader struct {
 	folderPath string
 	basePath   string
 	hidden     bool
+}
+
+func (fileInfo FileInfo) ToJSON() []byte {
+	jsonData, err := json.Marshal(fileInfo)
+	if err != nil {
+		panic(err)
+	}
+
+	return jsonData
 }
 
 func folderStructureReader(r reader) (FileInfo, error) {

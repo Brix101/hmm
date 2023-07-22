@@ -1,4 +1,4 @@
-module home-server
+module github.com/Brix101/network-file-manager
 
 go 1.20
 

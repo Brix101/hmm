@@ -1,6 +1,10 @@
-package services
+package features
 
-import "github.com/jmoiron/sqlx"
+import (
+	"encoding/json"
+
+	"github.com/jmoiron/sqlx"
+)
 
 type FeatureServices struct {
 	Conn *sqlx.DB
@@ -14,7 +18,18 @@ type Table struct {
 	Name string `db:"name"`
 }
 
-func (s *FeatureServices) GetAll() ([]string, error) {
+type Features []string
+
+func (features Features) ToJSON() []byte {
+	jsonData, err := json.Marshal(features)
+	if err != nil {
+		panic(err)
+	}
+
+	return jsonData
+}
+
+func (s *FeatureServices) GetAll() (Features, error) {
 	var tables []Table
 	err := s.Conn.Select(&tables, "SELECT name FROM sqlite_master WHERE type='table';")
 	if err != nil {

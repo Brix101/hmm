@@ -1,4 +1,4 @@
-package services
+package users
 
 import (
 	"fmt"
@@ -6,10 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
-
-type UserServices struct {
-	Conn *sqlx.DB
-}
 
 var schema = `
 	CREATE TABLE IF NOT EXISTS users (
@@ -25,19 +21,6 @@ func NewUserServices(conn *sqlx.DB) *UserServices {
 	conn.MustExec(schema)
 
 	return &UserServices{Conn: conn}
-}
-
-type UserEntity struct {
-	Id       uuid.UUID `json:"id"`
-	Name     string    `json:"name"`
-	Email    string    `json:"email"`
-	Password string    `json:"-"`
-}
-
-type NewUser struct {
-	Name     string
-	Email    string
-	Password string
 }
 
 func (s *UserServices) CreateUser(data NewUser) (*UserEntity, error) {
@@ -58,8 +41,8 @@ func (s *UserServices) CreateUser(data NewUser) (*UserEntity, error) {
 	return user, nil
 }
 
-func (s *UserServices) GetAll() ([]UserEntity, error) {
-	users := []UserEntity{}
+func (s *UserServices) GetAll() (UserEntities, error) {
+	users := UserEntities{}
 	err := s.Conn.Select(&users, "SELECT id, name, email FROM users")
 	if err != nil {
 		return users, err
