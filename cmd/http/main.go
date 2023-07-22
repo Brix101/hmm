@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"home-server/internal/handlers"
+	"home-server/internal/middlewares"
 	"home-server/internal/services"
 	"home-server/pkg/db"
 	"log"
@@ -10,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -85,12 +85,11 @@ func service(conn *sqlx.DB) http.Handler {
 	r.Use(cors.Handler)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
+	r.Use(middlewares.ErrorHandler)
 
 	clientRouter := handlers.ClientRouter()
 	userServices := services.NewUserServices(conn)
 	featureServices := services.NewFeatureServices(conn)
-
-	r.Mount("/", clientRouter)
 
 	filesResource := handlers.FilesResource{FilesPath: filesPath}
 
@@ -98,6 +97,7 @@ func service(conn *sqlx.DB) http.Handler {
 	authResource := handlers.AuthResource{UserServices: userServices}
 	featureResource := handlers.FeaturesResource{FeatureServices: featureServices}
 
+	r.Mount("/", clientRouter)
 	r.Route("/api", func(r chi.Router) {
 		r.Mount("/", authResource.Routes())
 		r.Mount("/files", filesResource.Routes())
@@ -105,28 +105,7 @@ func service(conn *sqlx.DB) http.Handler {
 		r.Mount("/features", featureResource.Routes())
 	})
 
-	FileServer(r, "/data/files", filesDir)
+	filesResource.Serve(r, "/data/files", filesDir)
 
 	return r
-}
-
-// FileServer conveniently sets up a http.FileServer handler to serve
-// static files from a http.FileSystem.
-func FileServer(r chi.Router, path string, root http.FileSystem) {
-	if strings.ContainsAny(path, "{}*") {
-		panic("FileServer does not permit any URL parameters.")
-	}
-
-	if path != "/" && path[len(path)-1] != '/' {
-		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
-		path += "/"
-	}
-	path += "*"
-
-	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
-		fs.ServeHTTP(w, r)
-	})
 }

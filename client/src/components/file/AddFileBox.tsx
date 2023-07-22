@@ -37,7 +37,7 @@ function AddFileBox() {
       <SheetTrigger asChild>
         <Card className="fixed right-10 bottom-10">
           <CardContent className="p-1">
-            <Button variant={"outline"} size={"icon"}>
+            <Button size={"icon"}>
               <Icons.add />
             </Button>
           </CardContent>

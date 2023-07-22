@@ -7,11 +7,10 @@ type ErrorData struct {
 	Type    string `json:"type,omitempty"`
 }
 
-// ErrorMap represents a dynamic nested map
 type ErrorMap map[string]ErrorData
 
 type ErrorResponse struct {
-	Errors ErrorMap `json:"errors"`
+	Errors map[string]ErrorData `json:"errors"`
 }
 
 // NewErrorMap creates a new instance of the DynamicMap

@@ -40,6 +40,27 @@ func (rs FilesResource) Routes() chi.Router {
 	return r
 }
 
+// FileServer conveniently sets up a http.FileServer handler to serve
+// static files from a http.FileSystem.
+func (rs FilesResource) Serve(r chi.Router, path string, root http.FileSystem) {
+	if strings.ContainsAny(path, "{}*") {
+		panic("FileServer does not permit any URL parameters.")
+	}
+
+	if path != "/" && path[len(path)-1] != '/' {
+		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
+		path += "/"
+	}
+	path += "*"
+
+	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
+		rctx := chi.RouteContext(r.Context())
+		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
+		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
+		fs.ServeHTTP(w, r)
+	})
+}
+
 func (rs FilesResource) List(w http.ResponseWriter, r *http.Request) {
 	// Extract the nested route from the request URL
 	path := strings.TrimPrefix(r.URL.Path, "/")
@@ -113,7 +134,6 @@ func (rs FilesResource) Create(w http.ResponseWriter, r *http.Request) {
 	// Retrieve the name value from the form data
 	name := r.FormValue("name")
 
-	fmt.Println(name)
 	// They are accessible only after ParseMultipartForm is called
 	files := r.MultipartForm.File["files"]
 	if name == "" && len(files) <= 1 {
