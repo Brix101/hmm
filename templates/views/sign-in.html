@@ -1,0 +1,49 @@
+{{template "layout.html" .}} {{define "title"}}Sign In{{end}} {{define "content"}}
+<main class="main" id="sign-in">
+  <div class="container-fluid bg-300 dark__bg-1200">
+    <div class="bg-holder bg-auth-card-overlay" style="background-image: url(static/img/bg/37.png)"></div>
+    <!--/.bg-holder-->
+
+    <div class="py-5 row flex-center position-relative min-vh-100 g-0">
+      <div class="col-11 col-sm-8 col-xl-4">
+        <div class="border card border-200 auth-card">
+          <div class="card-body pe-md-0">
+            <div class="row align-items-center gx-0 gy-7">
+              <div class="mx-auto col">
+                <form class="auth-form-box" hx-post="/sign-in" hx-target="#sign-in" hx-swap="outerHTML"
+                  hx-indicator="#spinner">
+                  <div class="mb-7 text-center">
+                    <h3 class="text-1000">Sign In</h3>
+                    <p class="text-700">Get access to your account</p>
+                  </div>
+                  <div class="mb-3 text-start">
+                    <label class="form-label" for="email">Email address</label>
+                    <div class="form-icon-container">
+                      <input class="form-control form-icon-input" id="email" name="email" type="email"
+                        placeholder="name@example.com" /><span class="fas fa-user text-900 fs--1 form-icon"></span>
+                    </div>
+                  </div>
+                  <div class="mb-3 text-start">
+                    <label class="form-label" for="password">Password</label>
+                    <div class="form-icon-container">
+                      <input class="form-control form-icon-input" id="password" name="password" type="password"
+                        placeholder="Password" /><span class="fas fa-key text-900 fs--1 form-icon"></span>
+                    </div>
+                  </div>
+                  <button class="mb-3 btn btn-primary w-100" hx-post="/sign-in" hx-ext="disable-element"
+                    hx-disable-element="self">
+                    <span class="position-relative"> <span
+                        class="btn-loader-spinner spinner-border spinner-border-sm htmx-indicator" role="status"
+                        id="spinner" aria-hidden="true"></span>Sign In</span>
+                  </button>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+</main>
+{{end}}
