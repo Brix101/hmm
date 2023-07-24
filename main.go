@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
+	"github.com/Brix101/network-file-manager/internal/api/files"
 	"github.com/Brix101/network-file-manager/internal/api/users"
 	"github.com/Brix101/network-file-manager/internal/middlewares"
 	"github.com/Brix101/network-file-manager/internal/utils/db"
@@ -15,7 +17,6 @@ import (
 
 func main() {
 	// Echo instance
-	t := templates.New()
 	e := echo.New()
 
 	// Middleware
@@ -30,16 +31,20 @@ func main() {
 	// 	return false, nil
 	// }))
 	e.Static("/static", "templates/static")
-	e.Renderer = t
+	e.Renderer = templates.New()
 	e.Validator = middlewares.NewValidator()
 
 	d := db.Init()
 	us := users.NewUserServices(d)
+	reader := files.NewReader("", false)
 
 	sr := users.UserHandler{UserServices: us}
+	fr := files.FileHandler{Reader: reader}
 
 	v1 := e.Group("/api")
 	sr.Routes(v1)
+	fr.Routes(v1)
+
 	// Routes
 	e.GET("/", hello)
 	e.POST("/sign-in", func(c echo.Context) error {
@@ -53,7 +58,15 @@ func main() {
 		return c.Render(http.StatusOK, "sign-in.html", "asdfasdf")
 	})
 	// Start server
-	e.Logger.Fatal(e.Start(":1323"))
+	s := http.Server{
+		Addr:    "0.0.0.0:5000",
+		Handler: e,
+		// ReadTimeout: 30 * time.Second, // customize http.Server timeouts
+	}
+	log.Println("🚀🚀🚀 Server at http://" + s.Addr)
+	if err := s.ListenAndServe(); err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 }
 
 // Handler

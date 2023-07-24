@@ -11,10 +11,10 @@ type UserHandler struct {
 	UserServices *UserServices
 }
 
-func (rs UserHandler) Routes(v1 *echo.Group) {
+func (h UserHandler) Routes(v1 *echo.Group) {
 	user := v1.Group("/users")
-	user.GET("", rs.list)
-	user.POST("", rs.create)
+	user.GET("", h.list)
+	user.POST("", h.signUp)
 }
 
 func (uh UserHandler) list(c echo.Context) error {
@@ -26,7 +26,7 @@ func (uh UserHandler) list(c echo.Context) error {
 	return c.JSON(http.StatusOK, users)
 }
 
-func (uh UserHandler) create(c echo.Context) error {
+func (h UserHandler) signUp(c echo.Context) error {
 	var u User
 	req := &userRegisterRequest{}
 	if err := req.bind(c, &u); err != nil {
@@ -44,14 +44,14 @@ func (uh UserHandler) create(c echo.Context) error {
 	return c.JSON(http.StatusOK, u)
 }
 
-func (uh UserHandler) signIn(c echo.Context) error {
+func (h UserHandler) signIn(c echo.Context) error {
 	req := &userSignInRequest{}
 
 	if err := req.bind(c); err != nil {
 		return c.JSON(http.StatusUnprocessableEntity, utils.NewError(err))
 	}
 
-	u, err := uh.UserServices.GetByEmail(req.User.Email)
+	u, err := h.UserServices.GetByEmail(req.User.Email)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, utils.NewError(err))
 	}
