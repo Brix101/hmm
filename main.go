@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/Brix101/network-file-manager/internal/api/files"
 	"github.com/Brix101/network-file-manager/internal/api/users"
@@ -22,15 +20,12 @@ func main() {
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	// e.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
-	// 	// Be careful to use constant time comparison to prevent timing attacks
-	// 	if subtle.ConstantTimeCompare([]byte(username), []byte("joe")) == 1 &&
-	// 		subtle.ConstantTimeCompare([]byte(password), []byte("secret")) == 1 {
-	// 		return true, nil
-	// 	}
-	// 	return false, nil
-	// }))
-	e.Static("/static", "templates/static")
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"http://localhost:5173", "http://192.168.254.180:5173"},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+	}))
+
+	e.Static("/assets", "web/dist/assets")
 	e.Renderer = templates.New()
 	e.Validator = middlewares.NewValidator()
 
@@ -44,19 +39,15 @@ func main() {
 	v1 := e.Group("/api")
 	sr.Routes(v1)
 	fr.Routes(v1)
+	e.Use(middleware.StaticWithConfig(middleware.StaticConfig{
+		Root:   "web/dist",
+		Index:  "Index.html",
+		Browse: false,
+		HTML5:  true,
+	}))
 
-	// Routes
-	e.GET("/", hello)
-	e.POST("/sign-in", func(c echo.Context) error {
-		email := c.FormValue("email")
+	e.File("/*", "assets/index.html")
 
-		password := c.FormValue("password")
-
-		fmt.Println("++++++++++++++++++++", email, password)
-
-		time.Sleep(30 * time.Second)
-		return c.Render(http.StatusOK, "sign-in.html", "asdfasdf")
-	})
 	// Start server
 	s := http.Server{
 		Addr:    "0.0.0.0:5000",
@@ -67,9 +58,4 @@ func main() {
 	if err := s.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
-}
-
-// Handler
-func hello(c echo.Context) error {
-	return c.Render(http.StatusOK, "sign-in.html", "asdfasdf")
 }

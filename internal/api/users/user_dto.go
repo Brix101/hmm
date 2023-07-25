@@ -19,7 +19,6 @@ func (r *userRegisterRequest) bind(c echo.Context, u *User) error {
 		return err
 	}
 	if err := c.Validate(r); err != nil {
-		fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++", err.Error())
 		return err
 	}
 	u.Name = r.User.Name
@@ -44,6 +43,7 @@ func (r *userSignInRequest) bind(c echo.Context) error {
 		return err
 	}
 	if err := c.Validate(r); err != nil {
+		fmt.Println("++++++++++++++++", err.Error())
 		return err
 	}
 	return nil

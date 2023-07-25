@@ -3,7 +3,7 @@ import { SignInInput } from "@/types/auth.type";
 
 function signInUserMutation({ email, password }: SignInInput) {
   return apiClient.post(
-    "/signin",
+    "users/sign-in",
     JSON.stringify({ email: email, password: password }),
     {
       headers: {

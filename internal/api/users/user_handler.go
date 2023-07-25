@@ -15,6 +15,7 @@ func (h UserHandler) Routes(v1 *echo.Group) {
 	user := v1.Group("/users")
 	user.GET("", h.list)
 	user.POST("", h.signUp)
+	user.POST("/sign-in", h.signIn)
 }
 
 func (uh UserHandler) list(c echo.Context) error {
@@ -58,6 +59,7 @@ func (h UserHandler) signIn(c echo.Context) error {
 	if u == nil {
 		return c.JSON(http.StatusForbidden, utils.AccessForbidden())
 	}
+
 	if !u.CheckPassword(req.User.Password) {
 		return c.JSON(http.StatusForbidden, utils.AccessForbidden())
 	}
