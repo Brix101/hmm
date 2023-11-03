@@ -2,6 +2,7 @@
 members = [
     "crates/hmm",
     "crates/hmm-utils",
+    "crates/hmm-web",
 ]
 
 [workspace.package]
