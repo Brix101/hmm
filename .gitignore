@@ -1,10 +1,2 @@
-/files/*
-!/files/.gitkeep
-
-/data/*
-!/data/.gitkeep
-
-
-tmp/
-
-storage.db
+/target
+/test

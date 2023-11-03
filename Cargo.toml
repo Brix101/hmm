@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "crates/hmm",
+    "crates/hmm-utils",
+]
+
+[workspace.package]
+authors = ["Brix <brixterporras@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+hmm = { path = "./crates/hmm" }
+hmm-util = { path = "./crates/hmm-utils" }
+
+serde = { version = "1.0.190", features = ["derive"] }
+serde_json = "1.0.108"
