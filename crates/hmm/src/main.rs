@@ -1,12 +1,13 @@
-use hmm_utils::reader::{Reader, ViewFilesOptions};
+use hmm_utils::explorer::Explorer;
 
 fn main() {
-    let file_list = Reader::view_files(ViewFilesOptions{
-        path:None,
-        hidden:false
-    });
+    let explorer = Explorer::new();
+    let files = explorer.explore(
+        Some("/home/brix/Workspaces/brixterporras".to_string()),
+        Some(true),
+    );
 
-    for file in file_list {
+    for file in files {
         println!("{:#?}", file);
     }
 }
